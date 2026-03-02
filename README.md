@@ -19,9 +19,12 @@ _Copy that long string of letters and numbers (e.g., e769aa13...) and paste it i
 just copy the inject.js code into console in instagram.com and let it run
 
 
-# example key
-Action,Common Key Name in Network Tab,Example Value (2026)
-Timeline,doc_id or query_hash,8410294155302324
-Following,doc_id or query_hash,9102384755102938
-Followers,doc_id or query_hash,7510293844102938
-Tagged,doc_id or query_hash,1029384755610293
+# Instagram Network Tab Reference (2026) 
+
+### find these key in the payload tab of the request
+| Action     | Common Key Name in Network Tab | Example Value (2026)                          |
+|------------|---------------------------------|-----------------------------------------------|
+| Timeline   | doc_id or query_hash            | 8710294155302324 or c76146de99bb02f7415203be841dd25a |
+| Following  | doc_id or query_hash            | 9102384757102938 or d04b0a864b4b54887c0d870b0e77e076 |
+| Followers  | doc_id or query_hash            | 7510213844102938 or e769ag130647d2354c40ea6a439abd08 |
+| Tagged     | doc_id or query_hash            | 1029384754610293 or be13233562486510300db2724a87600b |
