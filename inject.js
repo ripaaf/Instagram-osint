@@ -18,10 +18,10 @@
 
     // --- 🔑 INTERNAL SYSTEM KEYS ---
     const HASHES = {
-        followers: 'c76146de99bb02f6415203be841dd25a',
-        following: 'd04b0a864b4b54837c0d870b0e77e076',
-        timeline: 'e769aa130647d2354c40ea6a439abd08',
-        tagged: 'be13233562486510300db2724a87600b'
+        followers: 'KEY',
+        following: 'KEY',
+        timeline: 'KEY',
+        tagged: 'KEY'
     };
     const APP_ID = "936619743392459";
     const DELAY = { min: 4500, max: 8000 };
