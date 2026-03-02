@@ -24,19 +24,27 @@
     };
 
     // --- 🔑 INTERNAL SYSTEM KEYS ---
+    // You can paste either the numeric doc_id OR the alphanumeric query_hash here.
     const HASHES = {
-        followers: 'KEY',
-        following: 'KEY',
-        timeline: 'KEY',
-        tagged: 'KEY'
+        followers: 'KEY_HERE',
+        following: 'KEY_HERE',
+        timeline: 'KEY_HERE',
+        tagged: 'KEY_HERE'
     };
     const APP_ID = "936619743392459";
-    const DELAY = { min: 4500, max: 8000 };
+    const DELAY = { min: 4500, max: 8500 };
 
-    // --- 🧬 DATA STORE & HELPERS ---
+    // --- 🧬 SYSTEM CORE & DETECTION ---
     let collectedData = [];
     const sleep = (ms) => new Promise(res => setTimeout(res, ms));
     const log = (msg, color = "#3897f0") => console.log(`%c${msg}`, `color: ${color}; font-weight: bold;`);
+
+    // DETECTION LOGIC: Automatically formats the URL based on key type
+    const getQueryUrl = (key, variables) => {
+        const isDocId = /^\d+$/.test(key); 
+        const param = isDocId ? 'doc_id' : 'query_hash';
+        return `https://www.instagram.com/graphql/query/?${param}=${key}&variables=${JSON.stringify(variables)}`;
+    };
 
     const downloadFile = (content, fileName, contentType) => {
         const a = document.createElement("a");
@@ -46,7 +54,7 @@
         a.click();
     };
 
-    log(`🚀 INITIALIZING DEEP OSINT: @${TARGET_USERNAME}`, "#00d4ff");
+    log(`🚀 INITIALIZING HYBRID DEEP OSINT: @${TARGET_USERNAME}`, "#00d4ff");
 
     try {
         // 1. PRIMARY PROFILE HARVESTING
@@ -71,34 +79,45 @@
             collectedData.push(profileInfo);
         }
 
-        if (!RUN_SCAN) return log("\n⚠️ RUN_SCAN IS OFF. Ending session.", "#ffcc00");
-        if (user.is_private && !user.followed_by_viewer) return log("🛑 PRIVATE ACCOUNT. Aborting.", "#ff4b2b");
+        if (MODULES.music_info && user.music_info) {
+            const m = user.music_info.music_asset_info;
+            log(`🎵 Profile Song: ${m.title} by ${m.display_artist}`, "#fca311");
+        }
 
-        // 2. TIMELINE ANALYSIS
+        if (!RUN_SCAN) return log("\n⚠️ RUN_SCAN IS OFF. Ending session.", "#ffcc00");
+        if (user.is_private && !user.followed_by_viewer) return log("🛑 PRIVATE ACCOUNT. Aborting network scan.", "#ff4b2b");
+
+        // 2. TIMELINE & BEHAVIOR ANALYSIS
         if (MODULES.behavioral_data || MODULES.location_intel) {
             log("\n[+] TIMELINE & GEOGRAPHIC ANALYSIS", "#fca311");
-            const timeline = await fetch(`https://www.instagram.com/graphql/query/?query_hash=${HASHES.timeline}&variables=${JSON.stringify({id: user.id, first: 12})}`).then(r => r.json());
-            timeline.data.user.edge_owner_to_timeline_media.edges.forEach(p => {
+            const url = getQueryUrl(HASHES.timeline, {id: user.id, first: 12});
+            const timeline = await fetch(url).then(r => r.json());
+            const posts = timeline.data.user.edge_owner_to_timeline_media.edges;
+
+            posts.forEach(p => {
                 const n = p.node;
                 const time = new Date(n.taken_at_timestamp * 1000).toLocaleString();
                 collectedData.push({ type: 'TARGET_POST', time, shortcode: n.shortcode, location: n.location?.name || 'None' });
-                console.log(`📸 [${time}] Code: ${n.shortcode}`);
+                console.log(`📸 [${time}] Code: ${n.shortcode} ${n.location ? '| 📍 ' + n.location.name : ''}`);
             });
         }
 
-        // 3. NETWORK SCANNING
+        // 3. NETWORK SCANNING (Followers/Following List)
         if (MODULES.network_likes) {
-            log(`\n[+] SCANNING ${SCAN_MODE.toUpperCase()} FOR YOUR LIKES`, "#fca311");
+            log(`\n[+] SCANNING ${SCAN_MODE.toUpperCase()} NETWORK FOR YOUR LIKES`, "#fca311");
             let network = [];
             let cursor = null;
             let hasNext = true;
 
             while (hasNext) {
-                const res = await fetch(`https://www.instagram.com/graphql/query/?query_hash=${HASHES[SCAN_MODE]}&variables=${JSON.stringify({id: user.id, first: 50, after: cursor})}`).then(r => r.json());
+                const url = getQueryUrl(HASHES[SCAN_MODE], {id: user.id, first: 50, after: cursor});
+                const res = await fetch(url).then(r => r.json());
                 const edge = (SCAN_MODE === 'followers') ? res.data.user.edge_followed_by : res.data.user.edge_follow;
+                
                 network.push(...edge.edges);
                 hasNext = edge.page_info.has_next_page;
                 cursor = edge.page_info.end_cursor;
+                console.log(`Collected ${network.length} accounts...`);
                 if (hasNext) await sleep(2000);
             }
 
@@ -111,7 +130,8 @@
                 let keepCheckingPosts = true;
 
                 while (keepCheckingPosts) {
-                    const postRes = await fetch(`https://www.instagram.com/graphql/query/?query_hash=${HASHES.timeline}&variables=${JSON.stringify({id: node.id, first: 12, after: postCursor})}`).then(r => r.json());
+                    const postUrl = getQueryUrl(HASHES.timeline, {id: node.id, first: 12, after: postCursor});
+                    const postRes = await fetch(postUrl).then(r => r.json());
                     const media = postRes.data.user.edge_owner_to_timeline_media;
                     
                     for (const m of media.edges) {
@@ -122,7 +142,7 @@
                                 url: `https://instagram.com/p/${m.node.shortcode}/`,
                                 date: new Date(m.node.taken_at_timestamp * 1000).toLocaleString()
                             };
-                            log(`❤️ Like Found @${node.username}`, "#ed4956");
+                            log(`❤️ Your Like Found @${node.username}`, "#ed4956");
                             collectedData.push(likeEntry);
                         }
                         postsProcessed++;
@@ -135,11 +155,12 @@
                     postCursor = media.page_info.end_cursor;
                     if (keepCheckingPosts) await sleep(1500);
                 }
-                await sleep(Math.floor(Math.random() * (DELAY.max - DELAY.min)) + DELAY.min);
+                const wait = Math.floor(Math.random() * (DELAY.max - DELAY.min)) + DELAY.min;
+                await sleep(wait);
             }
         }
 
-        // --- 🏁 EXPORT ---
+        // --- 🏁 FINAL EXPORT ---
         if (EXPORT_CONFIG.enabled && collectedData.length > 0) {
             log(`\n💾 EXPORTING ${collectedData.length} ROWS...`, "#2db84d");
             if (EXPORT_CONFIG.format === 'json') {
@@ -152,7 +173,8 @@
         }
 
         log("\n✨ DEEP SCAN COMPLETE", "#2db84d");
+
     } catch (err) {
-        console.error("❌ ERROR:", err);
+        console.error("❌ CRITICAL ERROR:", err);
     }
 })();
