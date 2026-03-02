@@ -14,3 +14,6 @@ retriving liked post of a person and other public infomation avaible
       Under the Payload or Headers tab, look for query_hash.
 
 _Copy that long string of letters and numbers (e.g., e769aa13...) and paste it into the HASHES section of the script._
+
+# How To Use
+just copy the inject.js code into console in instagram.com and let it run
